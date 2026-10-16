@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anima 训练台（本机）</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#fff; --line:#e2e5e9; --line-2:#eef1f4;
+    --fg:#1f2328; --fg-2:#5b6570; --fg-3:#8a939e;
+    --accent:#2563eb; --accent-soft:#eef4ff;
+    --ok:#15803d; --ok-soft:#effaf1;
+    --warn:#b45309; --warn-soft:#fff8ec;
+    --bad:#c02626; --bad-soft:#fdf0f0;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171a; --panel:#1c1f23; --line:#2c3137; --line-2:#24282d;
+      --fg:#e6e9ec; --fg-2:#a4adb7; --fg-3:#767f89;
+      --accent:#6699ff; --accent-soft:#1e2836;
+      --ok:#5fce8b; --ok-soft:#17251c;
+      --warn:#e0a458; --warn-soft:#2a2318;
+      --bad:#f08a8a; --bad-soft:#2a1c1c;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  }
+  .wrap{max-width:1280px;margin:0 auto;padding:20px 20px 48px}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.2px}
+  .sub{color:var(--fg-3);font-size:12.5px}
+  header .sp{flex:1}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px}
+  .card > h2{
+    font-size:13px;font-weight:600;margin:0;padding:11px 14px;
+    border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:8px;
+  }
+  .card > h2 .sp{flex:1}
+  .card .body{padding:14px}
+  .hint{color:var(--fg-3);font-size:12px;font-weight:400;line-height:1.5}
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+  @media (max-width:1000px){ .grid{grid-template-columns:minmax(0,1fr)} }
+  .status{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:var(--fg-2);align-items:center}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--fg-3)}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
+  #drop{
+    border:1.5px dashed var(--line);border-radius:9px;padding:26px 16px;text-align:center;
+    color:var(--fg-2);cursor:pointer;transition:background .12s,border-color .12s;background:var(--bg);
+  }
+  #drop:hover{border-color:var(--accent)}
+  #drop.on{border-color:var(--accent);background:var(--accent-soft)}
+  #drop b{display:block;font-size:13.5px;color:var(--fg);font-weight:600;margin-bottom:4px}
+  #drop span{font-size:12px}
+  .files{max-height:190px;overflow:auto;border:1px solid var(--line-2);border-radius:7px;margin-top:12px}
+  .files:empty{display:none}
+  .frow{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12.5px;border-bottom:1px solid var(--line-2)}
+  .frow:last-child{border-bottom:0}
+  .frow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11.5px}
+  .frow .sz{color:var(--fg-3);font-size:11px;font-variant-numeric:tabular-nums}
+  .frow .rm{color:var(--fg-3);cursor:pointer;padding:0 3px;font-size:14px;line-height:1}
+  .frow .rm:hover{color:var(--bad)}
+  .tag{font-size:10.5px;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--fg-3);font-weight:500}
+  .tag.img{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+  .tag.txt{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
+  .fset{border:0;padding:0;margin:0 0 15px}
+  .fset:last-child{margin-bottom:0}
+  .fset > legend{
+    font-size:11.5px;font-weight:600;color:var(--fg-3);text-transform:uppercase;
+    letter-spacing:.6px;padding:0;margin-bottom:9px;
+  }
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .fld{display:flex;flex-direction:column;gap:4px;margin-bottom:9px}
+  .fld.full{grid-column:1/-1}
+  .fld label{font-size:12px;color:var(--fg-2)}
+  .fld .n{color:var(--fg-3);font-size:11px;font-weight:400}
+  input[type=text],input[type=number],select{
+    width:100%;padding:6px 8px;font:inherit;font-size:13px;color:var(--fg);
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  }
+  input:focus,select:focus{outline:2px solid var(--accent-soft);outline-offset:0;border-color:var(--accent)}
+  .chk{display:flex;align-items:flex-start;gap:7px;padding:5px 0;font-size:12.5px;color:var(--fg-2);cursor:pointer}
+  .chk input{margin:2px 0 0}
+  .chk b{color:var(--fg);font-weight:500}
+  .chk small{display:block;color:var(--fg-3);font-size:11px;line-height:1.4}
+  button{
+    font:inherit;font-size:13px;padding:7px 13px;border-radius:7px;cursor:pointer;
+    border:1px solid var(--line);background:var(--panel);color:var(--fg);transition:background .12s,border-color .12s;
+  }
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover:not(:disabled){background:#1d4fd7;border-color:#1d4fd7;color:#fff}
+  button.danger{color:var(--bad);border-color:var(--line)}
+  button.danger:hover:not(:disabled){border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+  button.sm{padding:4px 9px;font-size:12px}
+  .actions{display:flex;flex-direction:column;gap:9px;margin-top:15px}
+  .actions .line{display:flex;gap:9px}
+  .actions .line > *{flex:1}
+  button#go{padding:11px 13px;font-size:14px}
+  .msg{border-radius:7px;padding:9px 11px;font-size:12.5px;margin-bottom:10px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  .msg.ok{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok)}
+  .msg.bad{background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad)}
+  .msg.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn)}
+  .msg.info{background:var(--bg);color:var(--fg-2);border:1px solid var(--line)}
+  .msg:empty{display:none}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px}
+  .kv dt{color:var(--fg-3)}
+  .kv dd{margin:0;color:var(--fg-2)}
+  .bar{height:6px;border-radius:3px;background:var(--line-2);overflow:hidden;margin:10px 0 6px}
+  .bar > i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+  .bar.indet > i{width:35%;animation:slide 1.3s infinite ease-in-out}
+  @keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+  #log{
+    margin:0;padding:12px 14px;background:var(--bg);border-radius:0 0 10px 10px;
+    font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--fg-2);
+    height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all;
+  }
+  #log .e{color:var(--bad)}
+  .logcard > h2{border-bottom:1px solid var(--line-2)}
+  code{font-family:var(--mono);font-size:11.5px;background:var(--bg);padding:1px 4px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Anima 训练台</h1>
+    <span class="sub">本机 3070 8GB · Anima 风格 LoRA · 拖文件 → 调参数 → 开训</span>
+    <span class="sp"></span>
+    <button class="sm" id="recheck">重新体检环境</button>
+  </header>
+
+  <div class="card"><div class="body">
+    <div class="status" id="env-bar"><span class="dot"></span>正在体检后端…</div>
+    <div class="kv" id="env-kv" style="margin-top:10px"></div>
+    <div class="msg" id="env-msg"></div>
+  </div></div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>数据集 <span class="sp"></span><span class="hint" id="ds-count"></span></h2>
+        <div class="body">
+          <div id="drop">
+            <b>把图片和同名 .txt 拖到这里</b>
+            <span>也可以拖整个文件夹、或一个 .zip。点这里同样能选文件。</span>
+          </div>
+          <input type="file" id="picker" multiple accept=".png,.jpg,.jpeg,.webp,.bmp,.txt,.zip" hidden>
+          <div class="msg" id="ds-msg"></div>
+          <div class="files" id="files"></div>
+          <div class="kv" id="ds-check" style="margin-top:12px"></div>
+          <div class="line" style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+            <button class="sm" id="clear">清空本地暂存</button>
+          </div>
+          <div class="hint" style="margin-top:9px">
+            ★ 风格 LoRA 的甜点区是 <b>10~15 张</b>（下限 8）——多不等于好。素材短边 ≥1024 最理想；
+            想看落桶明细跑 <code>python tools/pick_dataset.py &lt;目录&gt; --buckets</code>。
+            触发词<b>不会</b>自动加进 caption，得你自己写在每条开头。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>训练参数</h2>
+        <div class="body">
+
+          <fieldset class="fset">
+            <legend>基本</legend>
+            <div class="fld"><label>输出名 <span class="n">产物落在 train_anima/_out/ 下</span></label>
+              <input type="text" id="name" value="jm_style"></div>
+            <div class="fld"><label>触发词 <span class="n">只用于体检 caption 前缀；不会自动写进标注</span></label>
+              <input type="text" id="trigger" value="jm_style"></div>
+            <div class="fld"><label>底模</label>
+              <select id="dit">
+                <option value="aesthetic">anima-aesthetic-v1.1（★ 审美版，出图首选）</option>
+                <option value="turbo">anima-turbo-v1.1（蒸馏快版）</option>
+              </select></div>
+            <div class="row">
+              <div class="fld"><label>训练步数</label><input type="number" id="steps" value="600" min="1"></div>
+              <div class="fld"><label>分辨率</label><input type="number" id="resolution" value="1024" min="256" step="64"></div>
+            </div>
+            <label class="chk"><input type="checkbox" id="buckets" checked>
+              <span><b>按原图比例分桶（小图不放大）</b>
+                <small>不开时所有图被放大到「分辨率²」再随机裁。素材短边普遍 &lt;1024 就该勾上。</small></span></label>
+            <div class="hint">600 步按 12 张 ≈ 50 epoch（kohya 每 epoch 步数 = 张数/batch）。第一次建议先改成 <b>20</b> 步试通链路。</div>
+          </fieldset>
+
+          <fieldset class="fset">
+            <legend>LoRA</legend>
+            <div class="row">
+              <div class="fld"><label>rank</label><input type="number" id="network_dim" value="16" min="1"></div>
+              <div class="fld"><label>alpha</label><input type="number" id="network_alpha" value="16" min="1"></div>
+            </div>
+            <div class="fld"><label>seed</label><input type="number" id="seed" value="42" min="0"></div>
+            <div class="hint">作用面用 kohya 的默认：每层的 <b>self_attn + cross_attn + mlp</b>（含 MLP = 管纹理/风格，
+              正是风格 LoRA 要的；modulation/norm/final 默认排除）。α/r 取 1.0 最好换算（<code>.skills/75</code>）。</div>
+          </fieldset>
+
+          <fieldset class="fset">
+            <legend>优化</legend>
+            <div class="row">
+              <div class="fld"><label>学习率</label><input type="number" id="learning_rate" value="0.0001" step="0.00001" min="0"></div>
+              <div class="fld"><label>调度器</label>
+                <select id="lr_scheduler">
+                  <option>constant</option><option>constant_with_warmup</option>
+                  <option>cosine</option><option>linear</option>
+                </select></div>
+            </div>
+            <div class="row">
+              <div class="fld"><label>优化器</label>
+                <select id="optimizer">
+                  <option>AdamW8bit</option><option>AdamW</option>
+                  <option>Adafactor</option>
+                </select></div>
+              <div class="fld"><label>warmup 步</label><input type="number" id="lr_warmup_steps" value="0" min="0"></div>
+            </div>
+            <div class="row">
+              <div class="fld"><label>batch</label><input type="number" id="batch" value="1" min="1"></div>
+              <div class="fld"><label>梯度累积</label><input type="number" id="grad_accum" value="1" min="1"></div>
+            </div>
+            <div class="row">
+              <div class="fld"><label>caption dropout</label><input type="number" id="caption_dropout" value="0.1" step="0.01" min="0" max="1"></div>
+              <div class="fld"><label>max grad norm</label><input type="number" id="max_grad_norm" value="1.0" step="0.1" min="0"></div>
+            </div>
+            <div class="row">
+              <div class="fld"><label>timestep sampling</label>
+                <select id="timestep_sampling">
+                  <option>sigmoid</option><option>shift</option><option>uniform</option>
+                  <option>sigma</option><option>flux_shift</option>
+                </select></div>
+              <div class="fld"><label>discrete flow shift</label><input type="number" id="flow_shift" value="1.0" step="0.1" min="0"></div>
+            </div>
+            <div class="hint">caption dropout 是把一部分样本的 caption 换成空串（走无条件训练，让 CFG 更好使），
+              <b>不是</b>「让触发词学风格」。kohya 把它放在数据集配置里，所以改它要重跑（本台缓存在内存，不会脏）。<br>
+              ★ 参数基线照 <code>.skills/70 §9.2</code>：rank/α <b>16/16</b>、步数 <b>600</b>、lr <b>1e-4 constant</b>、
+              warmup 0、caption dropout <b>0.1</b>、seed <b>42</b>、每 <b>200</b> 步存一次留 <b>2</b> 个 —— 都已按它设好。
+              唯一有意不同的是 <b>batch/累积 1/1</b>（云卡那张表是 1/4，那是 32G 卡的配置）；
+              本机 8GB 想更稳可以填 4，代价是**时长约 ×4**（不额外吃显存）。</div>
+          </fieldset>
+
+          <fieldset class="fset">
+            <legend>显存（本机 8GB 的关键）</legend>
+            <div class="fld"><label>blocks_to_swap <span class="n">0~26（28 层模型上限）；越大越省显存、越慢</span></label>
+              <input type="number" id="blocks_to_swap" value="16" min="0" max="26"></div>
+            <label class="chk"><input type="checkbox" id="gradient_checkpointing" checked>
+              <span><b>gradient checkpointing</b><small>省激活显存，代价是慢一点。</small></span></label>
+            <label class="chk"><input type="checkbox" id="cache_latents" checked>
+              <span><b>cache latents</b><small>图先编码成 latent，VAE 用完整场释放。</small></span></label>
+            <label class="chk"><input type="checkbox" id="cache_te" checked>
+              <span><b>cache text encoder outputs</b><small>Qwen3-0.6B 编码完就赶出显存。<b>勾了就不训 TE LoRA</b>（风格 LoRA 本来也只训 DiT）。</small></span></label>
+            <label class="chk"><input type="checkbox" id="vae_2d" checked>
+              <span><b>qwen_image_vae_2d</b><small>官方给的数：1024² 编码峰值 4.4GB → 1.4GB，还快 2×。</small></span></label>
+            <div class="fld"><label>vae_chunk_size <span class="n">0 = 不切块</span></label>
+              <input type="number" id="vae_chunk" value="64" min="0" step="8"></div>
+            <div class="hint">显存还是不够就<b>先加 blocks_to_swap</b>（最多 26），其次把分辨率降到 768、batch 保持 1。
+              开训前把 Edge/微信/QQ/Steam 关掉 —— 这台机桌面常态就吃掉约 4GB 显存。</div>
+          </fieldset>
+
+          <fieldset class="fset">
+            <legend>保存 / 续跑</legend>
+            <div class="row">
+              <div class="fld"><label>每 N 步存一次</label><input type="number" id="save_every" value="200" min="0"></div>
+              <div class="fld"><label>最多留几档 <span class="n">每隔上面那步数存一档；想对比"早档/晚档"就设 4~6</span></label><input type="number" id="save_last" value="2" min="1"></div>
+            </div>
+            <label class="chk"><input type="checkbox" id="save_state" checked>
+              <span><b>保存训练状态（可续跑）</b><small>写 train_state-*；续跑要用它。LoRA 的 state 很小。</small></span></label>
+            <label class="chk"><input type="checkbox" id="tensorboard" checked>
+              <span><b>写 tensorboard 日志</b><small>loss 曲线以它为准 —— 别拿 tqdm 那几行抽样看（曾据此误判"过拟合"，见 <code>.skills/78</code>）。</small></span></label>
+            <div class="fld"><label>续跑：从已有输出目录接着训 <span class="n">填输出名（如 jm_style）；留空=从零</span></label>
+              <input type="text" id="resume" placeholder="留空 = 从零训" value=""></div>
+            <div class="hint">⚠️ 续跑时「训练步数」填的是 <b>总步数</b>（含已跑的）——已跑 300 想再跑 300 就填 <b>600</b>；
+              填 300 会立刻结束且不报错。</div>
+          </fieldset>
+
+          <div class="msg" id="param-msg"></div>
+          <div class="actions">
+            <button class="primary" id="go">开始训练</button>
+            <div class="line">
+              <button class="danger" id="stop" disabled>停止训练</button>
+              <button id="lora">查看产物</button>
+            </div>
+            <div class="msg info" style="margin:0">训练在本机独立进程里跑 —— 这个页面、甚至本服务关掉，它都会继续跑（但别关这台机器）。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card logcard">
+    <h2>运行状态 <span class="sp"></span><span class="hint" id="job-line">还没有任务</span></h2>
+    <div class="body" style="padding-bottom:0">
+      <div class="bar" id="bar"><i></i></div>
+      <div class="msg" id="run-msg"></div>
+    </div>
+    <pre id="log">（日志会出现在这里）</pre>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const IMG_RE = /\.(png|jpe?g|webp|bmp)$/i;
+const KEYS = ["name","trigger","dit","steps","resolution","buckets",
+  "network_dim","network_alpha","seed","learning_rate","lr_scheduler","lr_warmup_steps",
+  "optimizer","batch","grad_accum","caption_dropout","max_grad_norm","timestep_sampling","flow_shift",
+  "blocks_to_swap","gradient_checkpointing","cache_latents","cache_te","vae_2d","vae_chunk",
+  "save_every","save_last","save_state","tensorboard","resume"];
+let offset = 0, polling = null;
+
+function msg(el, cls, text) { el.className = "msg " + (cls || "info"); el.textContent = text || ""; }
+function busy(btn, on, text) {
+  if (!btn) return;
+  if (on) { btn.dataset.t = btn.textContent; btn.textContent = text || "…"; btn.disabled = true; }
+  else { if (btn.dataset.t) btn.textContent = btn.dataset.t; btn.disabled = false; }
+}
+async function jget(url) {
+  const r = await fetch(url);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+  return d;
+}
+async function jpost(url, body) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}) });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+  return d;
+}
+function fmtSize(b) {
+  if (b == null) return "";
+  return b > 1048576 ? (b / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(b / 1024)) + "KB";
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------------- 环境 ---------------- */
+async function envCheck() {
+  const b = $("recheck");
+  busy(b, true, "体检中…");
+  try {
+    const d = await jget("/api/env");
+    const bad = (d.items || []).filter(i => !i.ok);
+    $("env-bar").innerHTML = `<span class="dot ${bad.length ? "bad" : "ok"}"></span>`
+      + (bad.length ? `后端缺 ${bad.length} 项（先补上再开训）` : "后端齐备，可以开训")
+      + (d.gpu ? `　·　显存 ${esc(d.gpu)}` : "");
+    $("env-kv").innerHTML = (d.items || []).map(i =>
+      `<dt>${i.ok ? "✓" : "✗"} ${esc(i.name)}</dt><dd>${esc(i.detail)}</dd>`).join("");
+    if (bad.length) {
+      msg($("env-msg"), "bad", "缺的东西：\n· " + bad.map(i => i.name + "：" + i.detail
+        + (i.fix ? "　→ " + i.fix : "")).join("\n· "));
+    } else { msg($("env-msg"), "", ""); }
+    return d;
+  } catch (e) { msg($("env-msg"), "bad", "体检失败：" + e.message); }
+  finally { busy(b, false); }
+}
+
+/* ---------------- 数据集 ---------------- */
+async function refreshStage(withCheck) {
+  const d = await jget("/api/stage/list" + (withCheck ? "?trigger=" + encodeURIComponent($("trigger").value) : ""));
+  $("ds-count").textContent = d.n_img || d.n_txt
+    ? `本地暂存：${d.n_img} 张图 / ${d.n_txt} 个 txt（${fmtSize(d.total_bytes)}）` : "";
+  $("files").innerHTML = (d.files || []).map(f => {
+    const tag = IMG_RE.test(f.name) ? '<span class="tag img">图</span>'
+      : /\.txt$/i.test(f.name) ? '<span class="tag txt">txt</span>' : '<span class="tag">?</span>';
+    return `<div class="frow">${tag}<span class="nm">${esc(f.name)}</span>`
+      + `<span class="sz">${fmtSize(f.size)}</span>`
+      + `<span class="rm" data-n="${esc(f.name)}" title="从暂存删掉">×</span></div>`;
+  }).join("");
+  $("files").querySelectorAll(".rm").forEach(el => el.onclick = async () => {
+    await jpost("/api/stage/delete", { names: [el.dataset.n] });
+    refreshStage(true);
+  });
+  if (withCheck && d.check) renderCheck(d.check);
+  return d;
+}
+
+function renderCheck(c) {
+  const box = $("ds-check");
+  if (c.error) { box.innerHTML = `<dt>体检</dt><dd>${esc(c.error)}</dd>`; return; }
+  const rows = [
+    ["图片 / txt / 配对", `${c.n_img} / ${c.n_txt} / ${c.n_pair}`],
+    ["短边 最小/中位/最大", `${c.short_min} / ${c.short_med} / ${c.short_max}`],
+    ["不开分桶会被放大（中位/最大）", `×${c.ups_med} / ×${c.ups_max}　（>1.2 倍的有 ${c.n_up_over_1_2} 张）`],
+    ["合计", ((c.total_bytes || 0) / 1048576).toFixed(1) + " MB"],
+  ];
+  box.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+  // ★ 体检发现 BOM ⇒ 直接给一个「一键去掉」按钮（kohya 不去 BOM，BOM 会粘在触发词上）
+  //   正常路径下用不到它（上传时就自动去了），只有"上传前就在暂存里"的文件才会走到这里。
+  if (c.n_bom) {
+    const b = document.createElement("button");
+    b.className = "sm";
+    b.id = "debom";
+    b.textContent = `一键去掉 ${c.n_bom} 条 caption 的 BOM`;
+    b.onclick = async () => {
+      busy(b, true, "去 BOM 中…");
+      try {
+        const r = await fetch("/api/stage/strip-bom", { method: "POST" });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "失败");
+        msg($("ds-msg"), "ok", `已去掉 ${d.stripped} 条 caption 的 BOM，正在重新体检…`);
+        await refreshStage(true);
+      } catch (e) { msg($("ds-msg"), "bad", "去 BOM 失败：" + e.message); }
+      finally { busy(b, false); }
+    };
+    box.appendChild(b);
+  }
+  const w = c.warnings || [];
+  msg($("ds-msg"), w.length ? "warn" : "ok",
+    w.length ? "体检提醒：\n· " + w.join("\n· ") : "体检通过：图片与 caption 配对完整。");
+}
+
+async function walkEntry(entry, out) {
+  if (!entry) return;
+  if (entry.isFile) {
+    const f = await new Promise(res => entry.file(res, () => res(null)));
+    if (f) out.push({ file: f, rel: entry.fullPath.replace(/^\//, "") });
+    return;
+  }
+  if (entry.isDirectory) {
+    const rd = entry.createReader();
+    for (;;) {
+      const batch = await new Promise(res => rd.readEntries(res, () => res([])));
+      if (!batch.length) break;
+      for (const e of batch) await walkEntry(e, out);
+    }
+  }
+}
+
+async function ingestFiles(pairs) {
+  const keep = pairs.filter(p => {
+    const n = (p.rel || p.file.name);
+    if (/(^|\/)(__MACOSX|\.DS_Store)/.test(n)) return false;
+    return IMG_RE.test(n) || /\.txt$/i.test(n) || /\.zip$/i.test(n);
+  });
+  if (!keep.length) { msg($("ds-msg"), "warn", "没找到图片 / .txt / .zip —— 其它类型会被忽略。"); return; }
+  let done = 0, nimg = 0, ntxt = 0, nzip = 0, nbom = 0;
+  for (const p of keep) {
+    const name = p.rel || p.file.name;
+    try {
+      if (/\.zip$/i.test(name)) {
+        const r = await fetch("/api/stage/zip", { method: "POST", body: p.file });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "zip 解包失败");
+        nzip++;
+        nbom += d.bom_stripped || 0;
+      } else {
+        const r = await fetch("/api/stage/put?name=" + encodeURIComponent(name), { method: "POST", body: p.file });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "上传失败");
+        if (IMG_RE.test(name)) nimg++; else ntxt++;
+        if (d.bom_stripped) nbom++;
+      }
+    } catch (e) { msg($("ds-msg"), "bad", `「${name}」没进去：${e.message}`); }
+    done++;
+    msg($("ds-msg"), "info", `读取中 ${done}/${keep.length} …`);
+  }
+  msg($("ds-msg"), "ok", `已收下：图片 ${nimg}、txt ${ntxt}` + (nzip ? `、zip ${nzip} 个已解包` : "")
+    + (nbom ? `；★ 已自动去掉 ${nbom} 条 caption 的 UTF-8 BOM（否则 BOM 会粘在触发词上、风格不生效）` : ""));
+  await refreshStage(true);
+}
+
+/* ---------------- 开训 ---------------- */
+function collect() {
+  const o = {};
+  for (const k of KEYS) {
+    const el = $(k);
+    if (!el) continue;
+    if (el.type === "checkbox") o[k] = el.checked;
+    else if (el.type === "number") o[k] = parseFloat(el.value);
+    else o[k] = el.value.trim();
+  }
+  return o;
+}
+
+async function startTraining() {
+  const o = collect();
+  if (!o.trigger) o.trigger = o.name;
+  const d = await jpost("/api/job/start", o);
+  if (!d.ok) throw new Error(d.error);
+  offset = 0; $("log").textContent = "";
+  msg($("run-msg"), "info", "已开跑：" + d.job.job_id + "\n" + (d.cmd || ""));
+  startPolling();
+}
+
+/* ---------------- 轮询 ---------------- */
+const PROGRESS_LINE = /\d+%\s*\|/;
+function appendLog(text) {
+  const el = $("log");
+  const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+  const keep = [];
+  for (const raw of text.split("\n")) {
+    const parts = raw.split("\r");
+    const line = parts[parts.length - 1];
+    if (!line || PROGRESS_LINE.test(line)) continue;
+    keep.push(line);
+  }
+  if (keep.length) {
+    const isErr = /(Error|Traceback|Exception|Killed|out of memory|CUDA out of memory|failed)/i.test(keep.join("\n"));
+    const span = document.createElement("span");
+    if (isErr) span.className = "e";
+    span.textContent = keep.join("\n") + "\n";
+    el.appendChild(span);
+    if (el.childNodes.length > 600) el.removeChild(el.firstChild);
+    if (stick) el.scrollTop = el.scrollHeight;
+  }
+}
+function setBar(pct, indet) {
+  const bar = $("bar");
+  bar.className = "bar" + (indet ? " indet" : "");
+  if (!indet) bar.firstElementChild.style.width = (pct || 0) + "%";
+}
+async function pollOnce() {
+  let d;
+  try { d = await jget("/api/job?offset=" + offset); }
+  catch (e) { $("job-line").textContent = "查状态失败：" + e.message; return; }
+  if (!d.has_job) { $("job-line").textContent = "还没有任务"; return; }
+  if (d.log) { appendLog(d.log); offset = d.offset; }
+  const p = d.progress || {};
+  $("job-line").textContent = `${d.job_id} · ${d.name} · ${d.alive ? "运行中" : "已结束"}`
+    + (p.step ? ` · 第 ${p.step}/${p.total} 步` : "")
+    + (p.epoch ? ` · epoch ${p.epoch}/${p.epochs}` : "")
+    + (p.loss != null ? ` · loss ${p.loss.toFixed(4)}` : "")
+    + ` · ${d.elapsed}s`;
+  if (p.pct != null) setBar(p.pct, false); else setBar(0, d.alive);
+  $("stop").disabled = !d.alive;
+  if (d.alive) {
+    msg($("run-msg"), "info", `本机正在跑（显存 ${d.gpu || "n/a"}）。可以关掉这个页面，训练不受影响。`);
+  } else if (d.rc !== null || d.stopped) {
+    const ok = String(d.rc).trim() === "0";
+    msg($("run-msg"), ok ? "ok" : (d.stopped ? "warn" : "bad"),
+      (d.stopped && d.rc === null ? "已手动停止。" : `训练结束，退出码 ${d.rc}。`) +
+      `输出目录：${d.out_dir}` +
+      (d.out_files && d.out_files.length ? "\n产物：" + d.out_files.map(f => f.name + "（" + f.mb + "MB）").join("、") : "") +
+      (ok ? "\n★ 产物是 kohya 原格式；点「查看产物」可另存一份 ComfyUI 键名的版本"
+            + "（只是改名，alpha 本来就在文件里 ⇒ 用的时候 strength 填 1.0）。" : "\n上面日志最后 40 行是失败现场。"));
+    stopPolling();
+  }
+}
+function startPolling() {
+  if (polling) return;
+  polling = setInterval(() => pollOnce().catch(() => { }), 3000);
+  pollOnce().catch(() => { });
+}
+function stopPolling() { if (polling) { clearInterval(polling); polling = null; } }
+
+/* ---------------- 停止 / 产物 ---------------- */
+async function stopTraining() {
+  if (!confirm("停止本机训练？已存下的 checkpoint 会保留，没存的部分就没了。")) return;
+  const b = $("stop");
+  busy(b, true, "停止中…");
+  try {
+    const d = await jpost("/api/job/stop", {});
+    msg($("run-msg"), d.ok ? "warn" : "bad", d.detail || d.error || "已发送停止");
+    setTimeout(() => pollOnce().catch(() => { }), 2500);
+  } catch (e) { msg($("run-msg"), "bad", e.message); }
+  finally { busy(b, false); }
+}
+
+async function showOut() {
+  const b = $("lora");
+  busy(b, true, "查找中…");
+  try {
+    const d = await jget("/api/out");
+    if (!d.files || !d.files.length) {
+      msg($("run-msg"), "warn", "还没有 .safetensors 产物（训练没跑完，或还没到「每 N 步存一次」）。\n目录：" + d.dir);
+      return;
+    }
+    const list = d.files.map((f, i) => `${i + 1}. ${f.name}  ${f.mb}MB`).join("\n");
+    const pick = prompt("产物（目录 " + d.dir + "）：\n\n" + list
+      + "\n\n输入要【转成 ComfyUI 版】的编号（可多个，逗号分隔）；留空 = 只看看：", "");
+    if (!pick) return;
+    for (const s of pick.split(/[,\s]+/).filter(Boolean)) {
+      const f = d.files[parseInt(s, 10) - 1];
+      if (!f) continue;
+      busy(b, true, "转换中…");
+      const r = await jpost("/api/convert", { src: f.path });
+      msg($("run-msg"), r.ok ? "ok" : "bad",
+        r.ok ? `已生成 ComfyUI 版：${r.dst}（${r.mb}MB）\n键名已改成 diffusion_model.*，alpha 原样保留 ⇒ strength 填 1.0。` : (r.error + "\n" + (r.log || "")));
+    }
+  } catch (e) { msg($("run-msg"), "bad", e.message); }
+  finally { busy(b, false); }
+}
+
+/* ---------------- 绑定 ---------------- */
+$("drop").onclick = () => $("picker").click();
+$("picker").onchange = async e => {
+  const pairs = [...e.target.files].map(f => ({ file: f, rel: f.name }));
+  e.target.value = "";
+  await ingestFiles(pairs);
+};
+$("drop").addEventListener("dragover", e => { e.preventDefault(); $("drop").classList.add("on"); });
+$("drop").addEventListener("dragleave", () => $("drop").classList.remove("on"));
+$("drop").addEventListener("drop", async e => {
+  e.preventDefault();
+  $("drop").classList.remove("on");
+  const items = [...(e.dataTransfer.items || [])];
+  const entries = items.map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  let pairs = [];
+  if (entries.length) { for (const en of entries) await walkEntry(en, pairs); }
+  else pairs = [...e.dataTransfer.files].map(f => ({ file: f, rel: f.name }));
+  if (!pairs.length) { msg($("ds-msg"), "warn", "没读到文件（拖文件夹时请用 Chrome/Edge）。"); return; }
+  await ingestFiles(pairs);
+});
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+$("clear").onclick = async () => {
+  if (!confirm("清空本地暂存目录 train_anima/_staging ？")) return;
+  await jpost("/api/stage/clear", {});
+  $("ds-check").innerHTML = "";
+  msg($("ds-msg"), "", "");
+  refreshStage(false);
+};
+$("go").onclick = () => startTraining().catch(e => msg($("param-msg"), "bad", e.message));
+$("stop").onclick = stopTraining;
+$("lora").onclick = showOut;
+$("recheck").onclick = envCheck;
+$("trigger").addEventListener("change", () => refreshStage(true));
+
+(async () => {
+  envCheck();
+  await refreshStage(true).catch(() => { });
+  const d = await jget("/api/job?offset=0").catch(() => null);
+  if (d && d.has_job) {
+    offset = d.offset || 0;
+    if (d.log) appendLog(d.log);
+    startPolling();
+  }
+})();
+</script>
+</body>
+</html>

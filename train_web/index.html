@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoRA 训练台</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#fff; --line:#e2e5e9; --line-2:#eef1f4;
+    --fg:#1f2328; --fg-2:#5b6570; --fg-3:#8a939e;
+    --accent:#2563eb; --accent-soft:#eef4ff;
+    --ok:#15803d; --ok-soft:#effaf1;
+    --warn:#b45309; --warn-soft:#fff8ec;
+    --bad:#c02626; --bad-soft:#fdf0f0;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171a; --panel:#1c1f23; --line:#2c3137; --line-2:#24282d;
+      --fg:#e6e9ec; --fg-2:#a4adb7; --fg-3:#767f89;
+      --accent:#6699ff; --accent-soft:#1e2836;
+      --ok:#5fce8b; --ok-soft:#17251c;
+      --warn:#e0a458; --warn-soft:#2a2318;
+      --bad:#f08a8a; --bad-soft:#2a1c1c;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  }
+  .wrap{max-width:1280px;margin:0 auto;padding:20px 20px 48px}
+
+  /* ---------- 顶栏 ---------- */
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.2px}
+  .sub{color:var(--fg-3);font-size:12.5px}
+  header .sp{flex:1}
+
+  /* ---------- 卡片 ---------- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px}
+  .card > h2{
+    font-size:13px;font-weight:600;margin:0;padding:11px 14px;
+    border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:8px;
+  }
+  .card > h2 .sp{flex:1}
+  .card .body{padding:14px}
+  .hint{color:var(--fg-3);font-size:12px;font-weight:400;line-height:1.5}
+
+  /* ---------- 布局 ---------- */
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+  @media (max-width:1000px){ .grid{grid-template-columns:minmax(0,1fr)} }
+
+  /* ---------- 状态条 ---------- */
+  .status{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:var(--fg-2);align-items:center}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--fg-3)}
+  .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
+
+  /* ---------- 拖拽区 ---------- */
+  #drop{
+    border:1.5px dashed var(--line);border-radius:9px;padding:26px 16px;text-align:center;
+    color:var(--fg-2);cursor:pointer;transition:background .12s,border-color .12s;background:var(--bg);
+  }
+  #drop:hover{border-color:var(--accent)}
+  #drop.on{border-color:var(--accent);background:var(--accent-soft)}
+  #drop b{display:block;font-size:13.5px;color:var(--fg);font-weight:600;margin-bottom:4px}
+  #drop span{font-size:12px}
+
+  /* ---------- 文件列表 ---------- */
+  .files{max-height:190px;overflow:auto;border:1px solid var(--line-2);border-radius:7px;margin-top:12px}
+  .files:empty{display:none}
+  .frow{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12.5px;border-bottom:1px solid var(--line-2)}
+  .frow:last-child{border-bottom:0}
+  .frow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);font-size:11.5px}
+  .frow .sz{color:var(--fg-3);font-size:11px;font-variant-numeric:tabular-nums}
+  .frow .rm{color:var(--fg-3);cursor:pointer;padding:0 3px;font-size:14px;line-height:1}
+  .frow .rm:hover{color:var(--bad)}
+  .tag{font-size:10.5px;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--fg-3);font-weight:500}
+  .tag.img{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+  .tag.txt{color:var(--ok);border-color:var(--ok);background:var(--ok-soft)}
+
+  /* ---------- 表单 ---------- */
+  .fset{border:0;padding:0;margin:0 0 15px}
+  .fset:last-child{margin-bottom:0}
+  .fset > legend{
+    font-size:11.5px;font-weight:600;color:var(--fg-3);text-transform:uppercase;
+    letter-spacing:.6px;padding:0;margin-bottom:9px;
+  }
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .fld{display:flex;flex-direction:column;gap:4px;margin-bottom:9px}
+  .fld.full{grid-column:1/-1}
+  .fld label{font-size:12px;color:var(--fg-2)}
+  .fld .n{color:var(--fg-3);font-size:11px;font-weight:400}
+  input[type=text],input[type=number],select{
+    width:100%;padding:6px 8px;font:inherit;font-size:13px;color:var(--fg);
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+  }
+  input:focus,select:focus{outline:2px solid var(--accent-soft);outline-offset:0;border-color:var(--accent)}
+  .chk{display:flex;align-items:flex-start;gap:7px;padding:5px 0;font-size:12.5px;color:var(--fg-2);cursor:pointer}
+  .chk input{margin:2px 0 0}
+  .chk b{color:var(--fg);font-weight:500}
+  .chk small{display:block;color:var(--fg-3);font-size:11px;line-height:1.4}
+
+  /* ---------- 按钮 ---------- */
+  button{
+    font:inherit;font-size:13px;padding:7px 13px;border-radius:7px;cursor:pointer;
+    border:1px solid var(--line);background:var(--panel);color:var(--fg);transition:background .12s,border-color .12s;
+  }
+  button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.primary:hover:not(:disabled){background:#1d4fd7;border-color:#1d4fd7;color:#fff}
+  button.danger{color:var(--bad);border-color:var(--line)}
+  button.danger:hover:not(:disabled){border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+  button.sm{padding:4px 9px;font-size:12px}
+  .actions{display:flex;flex-direction:column;gap:9px;margin-top:15px}
+  .actions .line{display:flex;gap:9px}
+  .actions .line > *{flex:1}
+  button#go{padding:11px 13px;font-size:14px}
+
+  /* ---------- 提示 ---------- */
+  .msg{border-radius:7px;padding:9px 11px;font-size:12.5px;margin-bottom:10px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  .msg.ok{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok)}
+  .msg.bad{background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad)}
+  .msg.warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn)}
+  .msg.info{background:var(--bg);color:var(--fg-2);border:1px solid var(--line)}
+  .msg:empty{display:none}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px}
+  .kv dt{color:var(--fg-3)}
+  .kv dd{margin:0;color:var(--fg-2)}
+
+  /* ---------- 进度 ---------- */
+  .bar{height:6px;border-radius:3px;background:var(--line-2);overflow:hidden;margin:10px 0 6px}
+  .bar > i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+  .bar.indet > i{width:35%;animation:slide 1.3s infinite ease-in-out}
+  @keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+
+  /* ---------- 日志 ---------- */
+  #log{
+    margin:0;padding:12px 14px;background:var(--bg);border-radius:0 0 10px 10px;
+    font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--fg-2);
+    height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all;
+  }
+  #log .e{color:var(--bad)}
+  .logcard > h2{border-bottom:1px solid var(--line-2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>LoRA 训练台</h1>
+    <span class="sub">Qwen-Image-2.1 · 拖文件 → 调参数 → 开训</span>
+    <span class="sp"></span>
+    <button class="sm" id="recheck">刷新云卡状态</button>
+  </header>
+
+  <div class="card"><div class="body">
+    <div class="status" id="ssh-bar"><span class="dot"></span>正在检查云卡…</div>
+  </div></div>
+
+  <div class="grid">
+    <div>
+      <!-- ============ 数据 ============ -->
+      <div class="card">
+        <h2>数据集 <span class="sp"></span><span class="hint" id="ds-count"></span></h2>
+        <div class="body">
+          <div id="drop">
+            <b>把图片和同名 .txt 拖到这里</b>
+            <span>也可以拖整个文件夹、或一个 .zip。点这里同样能选文件。</span>
+          </div>
+          <input type="file" id="picker" multiple accept=".png,.jpg,.jpeg,.webp,.bmp,.txt,.zip" hidden>
+          <div class="msg" id="ds-msg"></div>
+          <div class="files" id="files"></div>
+          <div class="kv" id="ds-check" style="margin-top:12px"></div>
+          <div class="line" style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+            <button class="sm" id="push">只上传到云卡并体检</button>
+            <button class="sm danger" id="clear">清空本地暂存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <!-- ============ 参数 ============ -->
+      <div class="card">
+        <h2>训练参数</h2>
+        <div class="body">
+
+          <fieldset class="fset">
+            <legend>基本</legend>
+            <div class="fld"><label>输出名 <span class="n">云端 /lora-out/ 下的目录名</span></label>
+              <input type="text" id="name" value="bj_style"></div>
+            <div class="fld"><label>触发词 <span class="n">出图时要用；训练时<b>不会</b>自动加进你的标注</span></label>
+              <input type="text" id="trigger" value="bj_style"></div>
+            <div class="hint">★ 触发词<b>不会</b>被拼到 caption 前面（官方脚本里它和 caption 是<b>二选一</b>：
+              有 caption 就用 caption，某张图没 caption 时才拿它兜底）。
+              它在这里只干两件事：① 体检时检查每条 caption 是否以它开头；② 无 caption 兜底。
+              ⇒ <b>触发词必须由你自己写在每条 caption 开头</b>（见《训练标注-DeepSeek规则.md》）。</div>
+            <div class="row">
+              <div class="fld"><label id="stepsLabel">训练步数</label><input type="number" id="steps" value="800" min="1"></div>
+              <div class="fld"><label>分辨率</label><input type="number" id="resolution" value="1024" min="256" step="64"></div>
+            </div>
+            <div class="hint" id="stepsHint">刚跑通流程时先把步数改成 <b>10</b> 试一次（约几分钟、几分钱），确认没报错再上正式步数。</div>
+          </fieldset>
+
+          <fieldset class="fset">
+            <legend>LoRA</legend>
+            <div class="row">
+              <div class="fld"><label>rank</label><input type="number" id="rank" value="16" min="1"></div>
+              <div class="fld"><label>alpha</label><input type="number" id="lora_alpha" value="16" min="1"></div>
+            </div>
+            <div class="row">
+              <div class="fld"><label>dropout</label><input type="number" id="lora_dropout" value="0.05" step="0.01" min="0" max="1"></div>
+              <div class="fld"><label>seed</label><input type="number" id="seed" value="42" min="0"></div>
+            </div>
+            <div class="fld">
+              <label>作用面（挂哪些模块）</label>
+              <select id="lora_layers">
+                <option value="to_k,to_q,to_v,to_out.0">默认 —— 仅 attention 4 层（128 个目标）</option>
+                <option value="to_k,to_q,to_v,to_out.0,img_mlp.gate_layer,img_mlp.proj,img_mlp.out">★ 推荐 —— + img_mlp 3 层（224 个目标，与官方加速 LoRA 同构）</option>
+              </select>
+            </div>
+            <div class="hint">作用面太窄 ⇒ 风格「浓度足但输出不稳」：LoRA 能拧的旋钮少，梯度只好把每个都拧到底。
+              加宽到 224 个目标后，建议把 <b>rank 降到 16~24</b> 配平体积（参数量约 ×2.5）。详见 <code>.skills/79</code>。</div>
+          </fieldset>
+
+          <fieldset class="fset">
+            <legend>优化</legend>
+            <div class="row">
+              <div class="fld"><label>学习率</label><input type="number" id="learning_rate" value="0.0001" step="0.00001" min="0"></div>
+              <div class="fld"><label>调度器</label>
+                <select id="lr_scheduler">
+                  <option>constant</option><option>constant_with_warmup</option>
+                  <option>linear</option><option>cosine</option>
+                  <option>cosine_with_restarts</option><option>polynomial</option>
+                </select></div>
+            </div>
+            <div class="row">
+              <div class="fld"><label>batch</label><input type="number" id="batch" value="1" min="1"></div>
+              <div class="fld"><label>梯度累积</label><input type="number" id="grad_accum" value="4" min="1"></div>
+            </div>
+            <div class="row">
+              <div class="fld"><label>caption dropout <span class="n">官方默认 0</span></label><input type="number" id="caption_dropout" value="0.1" step="0.01" min="0" max="1"></div>
+              <div class="fld"><label>warmup 步</label><input type="number" id="warmup" value="0" min="0"></div>
+            </div>
+            <div class="hint">caption dropout 的真实作用：随机把一部分样本的 caption 换成<b>空字符串</b>，
+              让这部分走<b>无条件</b>训练（为的是 CFG 更好使），<b>不是</b>"让触发词学风格"。
+              官方脚本默认就是 <b>0.0</b>；填 0 即关闭。</div>
+          </fieldset>
+
+          <fieldset class="fset">
+            <legend>显存与保存</legend>
+            <div class="row">
+              <div class="fld"><label>存 checkpoint 每 N 步</label><input type="number" id="ckpt_steps" value="200" min="1"></div>
+              <div class="fld"><label>最多留几个</label><input type="number" id="ckpt_limit" value="2" min="1"></div>
+            </div>
+            <label class="chk"><input type="checkbox" id="offload" checked>
+              <span><b>offload</b><small>VAE 与文本编码器不用时挪到 CPU。32G 卡靠它就不用量化底模，质量更好。</small></span></label>
+            <label class="chk"><input type="checkbox" id="gradient_checkpointing" checked>
+              <span><b>gradient checkpointing</b><small>省显存，代价是慢一点。</small></span></label>
+            <label class="chk"><input type="checkbox" id="use_8bit_adam" checked>
+              <span><b>8bit Adam</b><small>优化器状态省一半显存。</small></span></label>
+            <label class="chk"><input type="checkbox" id="cache_latents" checked>
+              <span><b>cache latents</b><small>预先把图编码成 latent，省时间。</small></span></label>
+            <label class="chk"><input type="checkbox" id="buckets">
+              <span><b>按原图比例分桶（小图不放大）</b><small>不开时：所有图被双线性放大到「分辨率²」再随机裁 —— 素材短边 541 的图要放大 1.9 倍、还裁掉 30%，线稿直接发虚。<br>
+                ★ 素材短边普遍 &lt;1024 就该勾上（不造假细节）；代价是训练边长变小，且<b>开启后「分辨率」被忽略</b>。用 <code>tools/pick_dataset.py</code> 先看自己素材的放大倍数。</small></span></label>
+            <label class="chk"><input type="checkbox" id="bnb">
+              <span><b>4bit 量化底模（兜底）</b><small>只在 offload 仍然 OOM 时才勾。会稍微伤 LoRA 质量。</small></span></label>
+          </fieldset>
+
+          <label class="chk" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line-2)">
+            <input type="checkbox" id="shutdown">
+            <span><b>训完自动关机</b><small>训练一结束就让云卡自己关机，不用你守着 —— 省钱。<br>
+              ⚠️ 关机后**要下载 LoRA 得重新开机**（数据盘的文件不会丢）。<br>
+              ⚠️ 关机有 1 分钟缓冲，想反悔就立刻 SSH 进去 <code>shutdown -c</code>。</small></span></label>
+
+          <label class="chk" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line-2)">
+            <input type="checkbox" id="dry">
+            <span><b>演练模式（不真训练）</b><small>不加载模型、不出 LoRA，只把「体检 → metadata → 开跑 → 出日志 → 收尾」走一遍，约 80 秒、不烧钱。第一次用建议先勾上，确认链路通了，顺便亲眼看看「关掉网页，云端照跑」。</small></span></label>
+
+          <!-- ★ 续跑（2026-10-14 加）：在已有 checkpoint 上接着跑。
+               ⛔ 两个静默陷阱，见 .skills/78：
+                 ① steps 是**总步数**（含已跑的），不是"再跑多少"；
+                 ② 输出目录名必须是上次那个（否则找不到 checkpoint，悄悄从零重训）。 -->
+          <label class="chk" style="margin-top:10px;padding-top:11px;border-top:1px solid var(--line-2)">
+            <input type="checkbox" id="resumeChk">
+            <span><b>续跑（在已有 checkpoint 上接着训）</b>
+              <small>勾上后：① 「输出目录名」必须填<b>上次那个</b>（如 <code>bj_style</code>）；
+                ② 下面的<b>步数要填「总步数」</b>——已跑 500 想再跑 500 ⇒ 填 <b>1000</b>，填 500 会立刻结束。</small></span></label>
+          <div class="fld" id="resumeRow" style="display:none;margin-top:8px">
+            <label>从哪个 checkpoint 续 <span class="n">latest = 目录里步数最大的那个</span></label>
+            <input type="text" id="resumeAt" value="latest" placeholder="latest 或 checkpoint-500">
+          </div>
+
+          <div class="msg" id="param-msg"></div>
+          <div class="actions">
+            <button class="primary" id="go">开始训练</button>
+            <div class="line">
+              <button class="danger" id="stop" disabled>停止训练</button>
+              <button id="lora">下载 LoRA</button>
+            </div>
+            <div class="msg info" style="margin:0">点「开始训练」后云端会独立开跑 —— 这个页面、甚至本机整个关掉，它都会继续跑。想停下来必须点「停止训练」。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 运行 ============ -->
+  <div class="card logcard">
+    <h2>运行状态 <span class="sp"></span><span class="hint" id="job-line">还没有任务</span></h2>
+    <div class="body" style="padding-bottom:0">
+      <div class="bar" id="bar"><i></i></div>
+      <div class="msg" id="run-msg"></div>
+    </div>
+    <pre id="log">（日志会出现在这里）</pre>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const KEYS = ["name","trigger","steps","rank","lora_alpha","lora_layers","lora_dropout","learning_rate",
+  "lr_scheduler","warmup","resolution","batch","grad_accum","caption_dropout",
+  "ckpt_steps","ckpt_limit","seed","offload","gradient_checkpointing",
+  "use_8bit_adam","cache_latents","bnb","buckets","shutdown","dry"];
+
+let polling = null, offset = 0, lastPushSig = "";
+const IMG_RE = /\.(png|jpe?g|webp|bmp)$/i;
+
+/* ---------------- 通用 ---------------- */
+function msg(el, cls, text) { el.className = "msg " + (cls || "info"); el.textContent = text || ""; }
+function busy(btn, on, text) {
+  if (on) {
+    if (!btn.dataset.old) btn.dataset.old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = text || "处理中…";
+  } else {
+    if (btn.dataset.old) { btn.textContent = btn.dataset.old; delete btn.dataset.old; }
+    btn.disabled = false;
+  }
+}
+async function jget(url) {
+  const r = await fetch(url);
+  const d = await r.json();
+  if (!r.ok && d.error) throw new Error(d.error);
+  return d;
+}
+async function jpost(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  });
+  const d = await r.json();
+  if (!r.ok && d.error) throw new Error(d.error);
+  return d;
+}
+function fmtSize(b) {
+  if (b < 1024) return b + " B";
+  if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
+  return (b / 1048576).toFixed(1) + " MB";
+}
+
+/* ---------------- 云卡状态 ---------------- */
+async function sshCheck() {
+  const bar = $("ssh-bar");
+  bar.innerHTML = '<span class="dot"></span>正在检查云卡…';
+  try {
+    const d = await jget("/api/ssh");
+    const it = [];
+    it.push(`<span><span class="dot ${d.has_gpu && !d.problems.length ? "ok" : "bad"}"></span>`
+      + `${d.host || "?"}</span>`);
+    it.push(`<span>GPU ${d.gpu || "n/a"}</span>`);
+    it.push(`<span>内存 ${d.mem_gb} G</span>`);
+    it.push(`<span>数据盘 ${(d.disk || "").replace(/\s+/g, " ")}</span>`);
+    it.push(`<span>云端数据集 ${d.remote_dataset_count} 个文件</span>`);
+    if (d.comfy_running) it.push('<span><span class="dot warn"></span>ComfyUI 在跑（不冲突）</span>');
+    if (d.training_now) it.push('<span><span class="dot warn"></span>已有训练进程</span>');
+    bar.innerHTML = it.join("");
+    if (d.problems && d.problems.length) {
+      msg($("run-msg"), "bad", "云卡前置条件不满足：\n· " + d.problems.join("\n· "));
+    } else if (($("run-msg").className || "").includes("bad")) {
+      msg($("run-msg"), "", "");
+    }
+  } catch (e) {
+    bar.innerHTML = `<span><span class="dot bad"></span>连不上云卡：${e.message}</span>`;
+  }
+}
+
+/* ---------------- 暂存区 ---------------- */
+function sigOf(files) {
+  return files.map(f => f.name + ":" + f.size).join("|");
+}
+
+async function refreshStage(withCheck) {
+  const d = await jget("/api/stage/list" + (withCheck ? "?trigger=" + encodeURIComponent($("trigger").value) : ""));
+  $("ds-count").textContent = d.n_img || d.n_txt
+    ? `本地暂存：${d.n_img} 张图 / ${d.n_txt} 个 txt（${fmtSize(d.total_bytes)}）` : "";
+  $("files").innerHTML = (d.files || []).map(f => {
+    const tag = IMG_RE.test(f.name) ? '<span class="tag img">图</span>'
+      : /\.txt$/i.test(f.name) ? '<span class="tag txt">txt</span>' : '<span class="tag">?</span>';
+    return `<div class="frow">${tag}<span class="nm">${esc(f.name)}</span>`
+      + `<span class="sz">${fmtSize(f.size)}</span>`
+      + `<span class="rm" data-n="${esc(f.name)}" title="从暂存删掉">×</span></div>`;
+  }).join("");
+  $("files").querySelectorAll(".rm").forEach(el => el.onclick = async () => {
+    await jpost("/api/stage/delete", { names: [el.dataset.n] });
+    lastPushSig = "";
+    refreshStage(true);
+  });
+  if (withCheck && d.check) renderCheck(d.check);
+  return d;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderCheck(c) {
+  const box = $("ds-check");
+  if (c.error) { box.innerHTML = `<dt>体检</dt><dd>${esc(c.error)}</dd>`; return; }
+  const rows = [
+    ["图片 / txt", `${c.n_img} / ${c.n_txt}`],
+    ["尺寸（宽）", c.w ? c.w.join(" / ") : "—"],
+    ["尺寸（高）", c.h ? c.h.join(" / ") : "—"],
+    ["色彩模式", Object.entries(c.modes || {}).map(([k, v]) => `${k}×${v}`).join(" ") || "—"],
+    ["caption 字数", c.cap_len ? c.cap_len.map(x => Math.round(x)).join(" / ") : "—"],
+    ["合计", (c.total_mb || 0) + " MB"],
+  ];
+  box.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+  const w = c.warnings || [];
+  msg($("ds-msg"), w.length ? "warn" : "ok",
+    w.length ? "体检提醒：\n· " + w.join("\n· ") : "体检通过：图片与 caption 配对完整。");
+}
+
+/* 拖拽：支持文件夹（递归取 webkitRelativePath） */
+async function walkEntry(entry, out) {
+  if (!entry) return;
+  if (entry.isFile) {
+    const f = await new Promise(res => entry.file(res, () => res(null)));
+    if (f) out.push({ file: f, rel: entry.fullPath.replace(/^\//, "") });
+    return;
+  }
+  if (entry.isDirectory) {
+    const rd = entry.createReader();
+    for (;;) {
+      const batch = await new Promise(res => rd.readEntries(res, () => res([])));
+      if (!batch.length) break;
+      for (const e of batch) await walkEntry(e, out);
+    }
+  }
+}
+
+async function ingestFiles(pairs) {
+  const keep = pairs.filter(p => {
+    const n = (p.rel || p.file.name);
+    if (/(^|\/)(__MACOSX|\.DS_Store)/.test(n)) return false;
+    return IMG_RE.test(n) || /\.txt$/i.test(n) || /\.zip$/i.test(n);
+  });
+  if (!keep.length) { msg($("ds-msg"), "warn", "没找到图片 / .txt / .zip —— 拖进来的其它类型会被忽略。"); return; }
+
+  let done = 0, nimg = 0, ntxt = 0, nzip = 0;
+  for (const p of keep) {
+    const name = p.rel || p.file.name;
+    try {
+      if (/\.zip$/i.test(name)) {
+        const r = await fetch("/api/stage/zip", { method: "POST", body: p.file });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "zip 解包失败");
+        nzip++;
+      } else {
+        const r = await fetch("/api/stage/put?name=" + encodeURIComponent(name),
+          { method: "POST", body: p.file });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || "上传失败");
+        if (IMG_RE.test(name)) nimg++; else ntxt++;
+      }
+    } catch (e) {
+      msg($("ds-msg"), "bad", `「${name}」没进去：${e.message}`);
+    }
+    done++;
+    msg($("ds-msg"), "info", `读取中 ${done}/${keep.length} …`);
+  }
+  lastPushSig = "";
+  msg($("ds-msg"), "ok", `已收下：图片 ${nimg}、txt ${ntxt}` + (nzip ? `、zip ${nzip} 个已解包` : ""));
+  await refreshStage(true);
+}
+
+/* ---------------- 推送数据集 ---------------- */
+async function pushDataset(btn) {
+  const st = await jget("/api/stage/list");
+  if (!st.n_img) throw new Error("本地暂存里一张图都没有");
+  if (btn) busy(btn, true, "上传中…");
+  try {
+    const d = await jpost("/api/data/push", {
+      clear: confirm("要把云端的 /root/autodl-tmp/dataset 清空后重铺吗？\n\n"
+        + "「确定」= 清空重建（推荐，避免残留旧图）\n「取消」= 保留云端已有的，只追加"),
+      trigger: $("trigger").value.trim()
+    });
+    if (!d.ok) throw new Error(d.error + (d.log ? "\n" + d.log.slice(-1200) : ""));
+    if (d.check) renderCheck(d.check);
+    lastPushSig = sigOf((await jget("/api/stage/list")).files || []);
+    return d;
+  } finally {
+    if (btn) busy(btn, false);
+  }
+}
+
+/* ---------------- 开训 ---------------- */
+function collect() {
+  const o = {};
+  for (const k of KEYS) {
+    const el = $(k);
+    if (!el) continue;
+    if (el.type === "checkbox") o[k] = el.checked;
+    else if (el.type === "number") o[k] = parseFloat(el.value);
+    else o[k] = el.value.trim();
+  }
+  // ★ 续跑（2026-10-14）：两个控件合成一个字段。
+  //   不勾 ⇒ ""（从零训）；勾 ⇒ "latest" 或 "checkpoint-<N>"。
+  //   格式由服务端再校验一遍（两边都拦）。
+  o.resume = $("resumeChk").checked ? ($("resumeAt").value.trim() || "latest") : "";
+  return o;
+}
+
+/* ★ 续跑开关（2026-10-14）
+ * 与「演练模式」互斥：演练不加载权重、不产生真 checkpoint，续跑它没有意义
+ * （服务端也会拒，但前端先挡住，别让用户点了才吃到 400）。
+ * 另外：续跑时把步数标签改成「总步数」，这是最容易填错的地方。
+ */
+function syncResume() {
+  const on = $("resumeChk").checked;
+  $("resumeRow").style.display = on ? "" : "none";
+  const dry = $("dry");
+  if (on) {
+    dry.checked = false;
+    dry.disabled = true;
+    $("stepsLabel").textContent = "总步数（含已跑的）";
+    refreshResumeHint();
+  } else {
+    dry.disabled = false;
+    $("stepsLabel").textContent = "训练步数";
+    $("stepsHint").innerHTML = "刚跑通流程时先把步数改成 <b>10</b> 试一次（约几分钟、几分钱），确认没报错再上正式步数。";
+  }
+}
+
+/* 把「从哪个 checkpoint 续」+「总步数」换算成「本次实际还会跑多少步」。
+ * 这一步纯前端提示，目的是挡住"填了 500 结果一步没跑"那个最坑的填法。
+ * ⚠️ 步数是从目录名 checkpoint-N 解析的，latest 在这里拿不到真实值，
+ *    所以 latest 时不显示具体数字，只提醒"总步数要大于已跑步数"。 */
+function refreshResumeHint() {
+  if (!$("resumeChk").checked) return;
+  const at = ($("resumeAt").value.trim() || "latest");
+  const total = parseInt($("steps").value, 10);
+  const m = /^checkpoint-(\d+)$/.exec(at);
+  let tip;
+  if (m) {
+    const done = parseInt(m[1], 10);
+    const more = total - done;
+    if (more <= 0) {
+      tip = `<b style="color:#c0392b">⚠️ 总步数（${total}）不大于已跑的 ${done} ⇒ 会立刻结束、一步都不跑！</b>`
+          + ` 想再跑一些请填 > ${done}（例如再跑 300 ⇒ 填 ${done + 300}）。`;
+    } else {
+      tip = `已跑到 <b>${done}</b> 步 ⇒ 本次还会跑 <b>${more}</b> 步（到 ${total} 结束）。`;
+    }
+  } else {
+    tip = `「latest」= 用目录里步数最大的 checkpoint。`
+        + `请确认<b>总步数大于它</b>，否则会立刻结束、一步都不跑。`;
+  }
+  $("stepsHint").innerHTML = tip;
+}
+$("resumeAt").oninput = refreshResumeHint;
+$("steps").oninput = refreshResumeHint;
+$("resumeChk").onchange = syncResume;
+$("dry").onchange = function () {
+  if ($("dry").checked) { $("resumeChk").checked = false; syncResume(); }
+};
+
+async function startTraining() {
+  const btn = $("go");
+  const pm = $("param-msg");
+  msg(pm, "", "");
+  if (!$("name").value.trim()) { msg(pm, "bad", "输出名不能空"); return; }
+  if (!$("trigger").value.trim()) { msg(pm, "bad", "触发词不能空"); return; }
+
+  const dry = $("dry").checked;
+  const st = await jget("/api/stage/list");
+  if (!st.n_img && !dry) { msg(pm, "bad", "还没拖图片进来（图片要和同名 .txt 一起拖）"); return; }
+  if (!dry && st.n_img > 0 && st.n_txt === 0
+      && !confirm("一张 caption（.txt）都没有，训练会用空的描述。确定继续？")) return;
+
+  const sig = sigOf(st.files || []);
+  const needPush = st.n_img > 0 && sig !== lastPushSig;
+  busy(btn, true, needPush ? "上传数据集…" : "启动中…");
+  try {
+    if (needPush) {
+      msg($("ds-msg"), "info", "先把本地暂存同步到云卡…");
+      await pushDataset(null);
+    }
+    busy(btn, true, "启动中…");
+    const d = await jpost("/api/job/start", collect());
+    if (!d.ok) throw new Error(d.error || "启动失败");
+    $("log").textContent = "";
+    offset = 0;
+    msg(pm, "ok", `${dry ? "演练" : "训练"}已启动：${d.job.job_id} → ${d.job.out_dir}\n`
+      + "云端独立运行中，本页面可以随时关掉。");
+    startPolling();
+  } catch (e) {
+    msg(pm, "bad", e.message);
+  } finally {
+    busy(btn, false);
+  }
+}
+
+/* ---------------- 轮询 ---------------- */
+const PROGRESS_LINE = /\d+%\s*\|/;   // tqdm 的进度条行，不写进日志正文
+
+function appendLog(text) {
+  const el = $("log");
+  const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+  const keep = [];
+  for (const raw of text.split("\n")) {
+    const parts = raw.split("\r");
+    const line = parts[parts.length - 1];
+    if (!line || PROGRESS_LINE.test(line)) continue;
+    keep.push(line);
+  }
+  if (keep.length) {
+    const isErr = /(Error|Traceback|Exception|Killed|out of memory|failed)/i.test(keep.join("\n"));
+    const span = document.createElement("span");
+    if (isErr) span.className = "e";
+    span.textContent = keep.join("\n") + "\n";
+    el.appendChild(span);
+    if (el.childNodes.length > 600) el.removeChild(el.firstChild);
+    if (stick) el.scrollTop = el.scrollHeight;
+  }
+}
+
+function setBar(pct, indet) {
+  const bar = $("bar");
+  bar.className = "bar" + (indet ? " indet" : "");
+  if (!indet) bar.firstElementChild.style.width = (pct || 0) + "%";
+}
+
+async function pollOnce() {
+  let d;
+  try { d = await jget("/api/job?offset=" + offset); }
+  catch (e) { $("job-line").textContent = "查状态失败：" + e.message; return; }
+  if (!d.has_job) { $("job-line").textContent = "还没有任务"; return; }
+
+  if (d.reset) { $("log").textContent = ""; offset = 0; }
+  if (d.log) { appendLog(d.log); offset = d.offset; }
+
+  const p = d.progress;
+  const running = d.alive;
+  $("job-line").textContent =
+    `${d.job_id} · ${d.name} · ${running ? "运行中" : "已结束"}`
+    + (p && p.step ? ` · 第 ${p.step}/${p.total} 步` : "")
+    + (p && p.loss != null ? ` · loss ${p.loss.toFixed(4)}` : "")
+    + ` · ${d.elapsed}s`;
+
+  if (p && p.pct != null) setBar(p.pct, false);
+  else setBar(0, running);
+
+  $("stop").disabled = !running;
+  if (running) {
+    msg($("run-msg"), "info", `云端正在跑（GPU ${d.gpu || "n/a"}）。可以关掉这个页面，训练不受影响。`);
+  } else if (d.rc !== null) {
+    const ok = String(d.rc).trim() === "0";
+    msg($("run-msg"), ok ? "ok" : "bad",
+      `训练结束，退出码 ${d.rc}。输出目录：${d.out_dir}`
+      + (d.out_files && d.out_files.length ? "\n产物：" + d.out_files.slice(-4).join("\n") : "")
+      + (ok ? "" : "\n上面日志里最后 40 行是失败现场的复述。"));
+    stopPolling();
+  }
+}
+
+function startPolling() {
+  if (polling) return;
+  polling = setInterval(() => pollOnce().catch(() => { }), 3000);
+  pollOnce().catch(() => { });
+}
+function stopPolling() { if (polling) { clearInterval(polling); polling = null; } }
+
+/* ---------------- 停止 / 下载 ---------------- */
+async function stopTraining() {
+  if (!confirm("停止云端训练？已经存下的 checkpoint 会保留，但没存的部分就没了。")) return;
+  const b = $("stop");
+  busy(b, true, "停止中…");
+  try {
+    const d = await jpost("/api/job/stop", {});
+    msg($("run-msg"), d.ok ? "warn" : "bad", d.detail || d.error || "已发送停止");
+    setTimeout(() => pollOnce().catch(() => { }), 2500);
+  } catch (e) { msg($("run-msg"), "bad", e.message); }
+  finally { busy(b, false); }
+}
+
+async function downloadLora() {
+  const b = $("lora");
+  busy(b, true, "查找中…");
+  try {
+    const d = await jget("/api/lora");
+    if (!d.files || !d.files.length) { msg($("run-msg"), "warn", "云端还没有 .safetensors 产物（还没训完、或还没到存 checkpoint 的步数）。"); return; }
+    const names = d.files.map(f => f.path);
+    const pick = prompt("要下载哪些？（每行一个路径，留空=全部）\n\n" + d.files.map(f => f.path + "   " + f.mb + "MB").join("\n"),
+      names.join("\n"));
+    if (pick === null) return;
+    const paths = pick.split("\n").map(s => s.trim()).filter(Boolean);
+    if (!paths.length) return;
+    busy(b, true, "下载中…");
+    const r = await jpost("/api/lora/download", { paths });
+    if (!r.ok) throw new Error(r.error);
+    msg($("run-msg"), "ok", "已下载到：\n" + r.dir + "\n" + r.files.map(f => "  " + f.path + "  " + f.mb + "MB").join("\n"));
+  } catch (e) { msg($("run-msg"), "bad", e.message); }
+  finally { busy(b, false); }
+}
+
+/* ---------------- 绑定 ---------------- */
+$("drop").onclick = () => $("picker").click();
+$("picker").onchange = async e => {
+  const pairs = [...e.target.files].map(f => ({ file: f, rel: f.name }));
+  e.target.value = "";
+  await ingestFiles(pairs);
+};
+$("drop").addEventListener("dragover", e => { e.preventDefault(); $("drop").classList.add("on"); });
+$("drop").addEventListener("dragleave", () => $("drop").classList.remove("on"));
+$("drop").addEventListener("drop", async e => {
+  e.preventDefault();
+  $("drop").classList.remove("on");
+  const items = [...(e.dataTransfer.items || [])];
+  const entries = items.map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  let pairs = [];
+  if (entries.length) { for (const en of entries) await walkEntry(en, pairs); }
+  else pairs = [...e.dataTransfer.files].map(f => ({ file: f, rel: f.name }));
+  if (!pairs.length) { msg($("ds-msg"), "warn", "没读到文件（拖文件夹时请用 Chrome/Edge）。"); return; }
+  await ingestFiles(pairs);
+});
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+
+$("push").onclick = async () => {
+  const b = $("push");
+  msg($("ds-msg"), "", "");
+  try { await pushDataset(b); msg($("ds-msg"), "ok", "已同步到云卡并完成体检。"); }
+  catch (e) { msg($("ds-msg"), "bad", e.message); }
+};
+$("clear").onclick = async () => {
+  if (!confirm("清空本机暂存目录？（云端已上传的不受影响）")) return;
+  await jpost("/api/stage/clear", {});
+  lastPushSig = "";
+  $("ds-check").innerHTML = "";
+  msg($("ds-msg"), "", "");
+  refreshStage(false);
+};
+$("go").onclick = () => startTraining().catch(e => msg($("param-msg"), "bad", e.message));
+$("stop").onclick = stopTraining;
+$("lora").onclick = downloadLora;
+$("recheck").onclick = sshCheck;
+$("trigger").addEventListener("change", () => refreshStage(true));
+
+/* 进页面先看看有没有在跑的 job */
+(async () => {
+  sshCheck();
+  await refreshStage(true).catch(() => { });
+  const d = await jget("/api/job?offset=0").catch(() => null);
+  if (d && d.has_job) {
+    offset = d.offset || 0;
+    if (d.log) appendLog(d.log);
+    startPolling();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+@echo off
+REM ============================================================
+REM  本机路径覆盖 —— 复制本文件为 paths.local.cmd 后按本机情况修改
+REM
+REM  paths.local.cmd 已被 .gitignore 忽略，不会进仓库。
+REM  只有「自动探测不适用」时才需要它：云卡生图各 .cmd 入口启动时
+REM  会 call 它（存在才 call）。
+REM ============================================================
+
+REM Python 解释器（跑 cloud_service.py / train_anima\server.py 的那个）
+REM 注释掉这一行 = 用 PATH 上的 python
+set "PY=C:\Path\To\python.exe"
+
+REM Anima 训练后端（kohya sd-scripts）；注释掉则用 paths.py 自动探测
+REM set "ANIMA_SD_DIR=D:\Path\To\anima\sd-scripts"

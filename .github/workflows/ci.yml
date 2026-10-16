@@ -1,0 +1,38 @@
+name: CI
+
+# 说明：这个仓库里绝大多数 `tools/verify/t_*.py` 需要**外部项目**才能真正跑
+# （`Android-tts/tools/comfy_web` 的 server.py、ComfyUI 实例、Anima 权重、
+#  云卡 SSH 隧道），在 GitHub Actions 上跑不了 —— 所以本 workflow **只跑
+# 能在干净环境里真正通过的判据**，不假装「全部测试通过」。
+#
+# 真正在这里把关的是两件事：
+#   1. 所有 .py 语法正确（compileall）
+#   2. 仓库没有被重新塞进本机路径 / 凭据 / 权重（tools/verify/t_paths.py）
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    name: 静态判据 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 语法检查 —— 全部 .py 必须可解析
+        run: python -m compileall -q .
+
+      - name: 路径泛化回归 —— 不得含本机路径 / 凭据 / 权重
+        run: python tools/verify/t_paths.py

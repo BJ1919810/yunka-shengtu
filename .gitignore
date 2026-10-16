@@ -1,0 +1,60 @@
+# 云卡连接信息（含口令，勿提交）
+cloud-comfy.config.json
+cloud-comfy.config.json.bak-*
+cloud-comfy.config.json.*
+
+# 出图产物
+out/*
+!out/.gitkeep
+
+# 上传/下载的临时源图
+input/*
+!input/.gitkeep
+
+# 训练 web 台的运行时目录（暂存 / 产物 / 任务状态 / 临时包）
+train_web/_staging/
+train_web/_downloads/
+train_web/_state.json
+train_web/_pack_*.zip
+train_web/_job_*.sh
+train_web/_incoming.zip
+
+# 本机训练台（train_anima）的运行时目录：数据集暂存 / 训练产物 / 作业日志
+train_anima/_staging/
+train_anima/_out/
+train_anima/_jobs/
+train_anima/_state.json
+
+# 模型权重与训练存档（体积大，绝不入库）
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+
+# 内部草稿与自测残留
+_scratch/
+_selftest_sh/
+_lora_probe/
+_peek/
+
+# 内部工作记忆与内部技术笔记（项目流水账 / 本机路径 / 环境细节）
+.workbuddy/
+.skills/
+
+# 本机路径覆盖（不入库；从 *.example 复制后按本机改）
+paths.local.cmd
+paths.local.py
+
+# 备份与缓存
+*.bak
+*.bak-*
+__pycache__/
+*.pyc
+
+# 内部规则文档全文（设计依据/版本史/样例记录）—— 不发布；只发布仅含提示词正文的
+# 反推提示词.md / 编辑提示词.md / 训练标注.md
+待处理问题.md
+反推提示词-DeepSeek规则.md
+编辑提示词-DeepSeek规则.md
+训练标注-DeepSeek规则.md

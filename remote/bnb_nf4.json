@@ -1,0 +1,8 @@
+{
+  "_comment": "给 --bnb_quantization_config_path 用：把 DiT 以 NF4 4bit 载入，32G 卡放得下。",
+  "_when": "先不加这个参数跑；真 OOM 了再加上（量化底模对 LoRA 质量有轻微影响，能不量化就不量化）。",
+  "load_in_4bit": true,
+  "bnb_4bit_quant_type": "nf4",
+  "bnb_4bit_compute_dtype": "bfloat16",
+  "bnb_4bit_use_double_quant": true
+}

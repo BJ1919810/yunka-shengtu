@@ -1,0 +1,17 @@
+# Windows 批处理必须原样保持 CRLF。
+# ⛔ 用 `-text`（禁止任何行尾转换）而不是 `text eol=crlf`：
+#    `-text` 让仓库里存的字节**就是 CRLF**，checkout 原样还原，
+#    不依赖 core.autocrlf 也不依赖 eol 转换逻辑 —— 少一层能出错的地方。
+#    背景：cmd.exe 对 LF-only 的批处理会**吃掉行首字符**
+#    （`REM ---` 被当成 `EM ---` 去执行）。
+*.cmd -text
+*.bat -text
+
+# 二进制，别做 diff / 行尾处理
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.safetensors binary
+*.pt   binary
+*.bin  binary
